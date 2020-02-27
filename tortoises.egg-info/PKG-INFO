@@ -1,0 +1,22 @@
+Metadata-Version: 1.1
+Name: tortoises
+Version: 0.0.2
+Summary: A toolkit for capturing network academic resources
+Home-page: https://github.com/LemuriaChen/tortoise
+Author: dandanlemuria
+Author-email: 18110980003@fudan.edu.cn
+License: MIT
+Description: 
+        A academic resource crawler, including web of science, baidu scholar and etc . 
+        
+Keywords: crawler,web of science,scholar
+Platform: UNKNOWN
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Classifier: Natural Language :: English
+Classifier: Programming Language :: Python
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.5
+Classifier: Programming Language :: Python :: 3.6
+Classifier: Programming Language :: Python :: 3.7
