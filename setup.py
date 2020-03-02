@@ -9,7 +9,7 @@ A academic resource crawler, including web of science, baidu scholar and etc .
 
 setuptools.setup(
     name='tortoises',
-    version='0.0.2',
+    version='0.0.3',
     description='A toolkit for capturing network academic resources',
     long_description=long_description,
     author='dandanlemuria',
