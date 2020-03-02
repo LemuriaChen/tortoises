@@ -22,3 +22,8 @@ def get_user_agent(random: bool) -> str:
         return choice(USER_AGENTS)
     else:
         return USER_AGENTS[0]
+
+
+def get_headers(random: bool) -> dict:
+    return {'User-Agent': get_user_agent(random)}
+

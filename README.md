@@ -50,5 +50,3 @@ print(apk.parsed_info)
 
 ### scholar 
 
-
-
