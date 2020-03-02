@@ -8,6 +8,7 @@ from selenium.webdriver.common.by import By
 from selenium.common.exceptions import TimeoutException
 import time
 import json
+from tqdm import tqdm
 
 
 class SkyDrive(object):
@@ -73,26 +74,31 @@ class SkyDrive(object):
             self.driver.find_element_by_class_name('g-button-right').click()
             WebDriverWait(driver=self.driver, timeout=100, poll_frequency=0.5).until(
                 expected_conditions.presence_of_element_located((By.XPATH, "//div[@node-type='fydGNC']")))
-            time.sleep(5)
+            time.sleep(2)
 
             # select all
-            self.driver.find_element_by_xpath("//div[@node-type='fydGNC']").click()
-            time.sleep(5)
+            selector = self.driver.find_element_by_xpath("//div[@node-type='fydGNC']")
+            self.driver.execute_script('arguments[0].click()', selector)
+            time.sleep(2)
 
             # save
-            self.driver.find_element_by_class_name('g-button').click()
+            selector = self.driver.find_element_by_class_name('g-button')
+            self.driver.execute_script('arguments[0].click()', selector)
             WebDriverWait(driver=self.driver, timeout=100, poll_frequency=0.5).until(
                 expected_conditions.presence_of_element_located((By.XPATH, "//div[@class='file-tree-container']")))
-            time.sleep(5)
+            time.sleep(2)
 
             # optional save path
-            self.driver.find_element_by_xpath(
+            selector = self.driver.find_element_by_xpath(
                 f"//div[@class='file-tree-container']/ul/li/ul/li//*[text()='{save_dir}']"
-            ).click()
-            time.sleep(10)
+            )
+            self.driver.execute_script('arguments[0].click()', selector)
+            time.sleep(2)
 
-            self.driver.find_element_by_xpath("//a[@title='确定']").click()
-            time.sleep(5)
+            selector = self.driver.find_element_by_xpath("//a[@title='确定']")
+            self.driver.execute_script('arguments[0].click()', selector)
+
+            time.sleep(2)
 
             if '已为您成功保存文件' in self.driver.page_source:
                 print('success to save')
@@ -104,5 +110,22 @@ class SkyDrive(object):
         self.driver.close()
 
 
-sd = SkyDrive(headless=True, limit=True).login_with_cookie()
-sd.save(url='https://pan.baidu.com/s/1YJw9auKFnKMSeJaYb1PJTg', pwd='mqxz')
+if __name__ == '__main__':
+
+    import pandas as pd
+    links = pd.read_csv('link.txt', header=None)
+
+    sd = SkyDrive(headless=False, limit=False).login_with_cookie()
+
+    for _, line in tqdm(links.iterrows()):
+        sd.save(url=line[0], pwd=line[1])
+
+
+"""
+Selenium — 点击被页面上其他元素遮住的控件
+点击被页面上其他元素遮住的控件
+使用WebDriver点击界面上Button元素时，如果当前Button元素被界面上其他元素遮住了
+或没出现在界面中（比如Button在页面底部，但是屏幕只能显示页面上半部分）
+使用默认的WebElement.Click()可能会触发不了Click事件
+需加上browser.execute_script(‘arguments[0].click()’, webElement);
+"""

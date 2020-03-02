@@ -5,9 +5,7 @@ from tortoises.driver import start_chrome
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions
 from selenium.webdriver.common.by import By
-# from selenium.common.exceptions import NoSuchElementException
 import time
-# import re
 
 
 start = time.time()
@@ -20,26 +18,7 @@ url_tags = ['xiaoshuowenxue', 'changxiao-tushu', 'hejitaozhuang', 'xuexi-ganhuo'
 tag_pages = [153, 23, 92, 13]
 
 
-"""
-# 登陆百度网盘主页
-driver.get('https://pan.baidu.com/')
-WebDriverWait(driver=driver, timeout=60, poll_frequency=0.5).until(
-    expected_conditions.presence_of_element_located((By.XPATH, "//div")))
-time.sleep(2)
-
-# 更改登陆方式
-driver.find_element_by_class_name('tang-pass-footerBarULogin').click()
-time.sleep(2)
-
-# 输入用户名和密码
-driver.find_element_by_id("TANGRAM__PSP_4__userName").send_keys('15071320287')
-driver.find_element_by_id("TANGRAM__PSP_4__password").send_keys('chenwei1993')
-driver.find_element_by_id("TANGRAM__PSP_4__submit").click()
-time.sleep(5)
-"""
-
-
-for part in range(len(tags)):
+for part in range(1, len(tags)):
 
     tag = tags[part]
     url_tag = url_tags[part]
@@ -87,7 +66,6 @@ for part in range(len(tags)):
 
                 time.sleep(2)
 
-                # if '提取码' not in driver.page_source:
                 try:
                     extra_link = driver.find_element_by_class_name('downbtn').get_attribute('href')
                     print(f'跳转链接：{extra_link}')
@@ -100,16 +78,16 @@ for part in range(len(tags)):
 
                 time.sleep(2)
 
-                vc = ''
-                for element in driver.find_elements_by_xpath("//div[@class='plus_l']//li"):
-                    if '百度网盘提取码 ：' in element.text:
-                        vc = element.text.replace('百度网盘提取码 ：', '').strip()
+                try:
+                    vc = ''
+                    for element in driver.find_elements_by_xpath("//div[@class='plus_l']//li"):
+                        if '百度网盘提取码 ：' in element.text:
+                            vc = element.text.replace('百度网盘提取码 ：', '').strip()
 
-                drive_url = driver.find_element_by_xpath("//div[@class='panel-body']/span/a").get_attribute('href')
-
-                # else:
-                #     vc = re.findall('提取码: ([a-zA-Z0-9]{4})', driver.page_source)[0]
-                #     drive_url = driver.find_element_by_class_name('downbtn').get_attribute('href')
+                    drive_url = driver.find_element_by_xpath("//div[@class='panel-body']/span/a").get_attribute('href')
+                except Exception as e:
+                    print(e)
+                    continue
 
                 if vc:
                     print(f'百度网盘链接: {drive_url}, 验证码: {vc}')
@@ -117,45 +95,8 @@ for part in range(len(tags)):
                     with open('link.txt', 'a+') as f:
                         f.write(drive_url + ',' + vc + '\n')
 
-                """
-                try:
-                    driver.get(drive_url)
-                    WebDriverWait(driver=driver, timeout=60, poll_frequency=0.5).until(
-                        expected_conditions.presence_of_element_located((By.XPATH, "//div")))
-                except Exception as e:
-                    print(e)
-                    continue
-
-                time.sleep(2)
-
-                try:
-                    driver.find_element_by_xpath('//input').send_keys(vc)
-                    driver.find_element_by_class_name('g-button-right').click()
-                except NoSuchElementException:
-                    pass
-
-                try:
-                    # 全部选中
-                    driver.find_element_by_class_name('Qxyfvg').click()
-                    # 保存到网盘
-                    driver.find_element_by_class_name('g-button').click()
-                except Exception as e:
-                    print(e)
-
-                try:
-                    for element in driver.find_elements_by_xpath("//div[@class='file-tree-container']//ul/li"):
-                        if element.text.startswith('电子书资源'):
-                            element.click()
-                            break
-                    driver.find_element_by_xpath("//a[@title='确定']").click()
-                    time.sleep(2)
-                    print('成功保存至网盘！')
-                except Exception as e:
-                    print(e)
-                """
 
 driver.close()
-
 end = time.time()
 print(f'done! {round(end - start, 4)} seconds used.')
 
