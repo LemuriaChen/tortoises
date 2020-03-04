@@ -13,12 +13,11 @@ from tortoises.driver import start_chrome
 
 class CloudDisk(object):
 
-    def __init__(self, user_name=None, password=None, *args, **kwargs):
+    def __init__(self, user_name=None, password=None, maximize=True, *args, **kwargs):
         self.driver = start_chrome(*args, **kwargs)
-        self.adjust(refresh=False, maximize=True)
-
         self.user_name = user_name
         self.password = password
+        self.adjust(refresh=False, maximize=maximize)
 
     def fetch_home(self):
         print('login < https://pan.baidu.com/ > ...')
@@ -161,6 +160,64 @@ class CloudDisk(object):
     def close(self):
         self.driver.close()
 
+    def make_dir(self, dir_name):
+        selector = self.dir_exist(dir_name)
+        if not selector:
+            # 新建按钮
+            selector = self.driver.find_element_by_xpath("//a[@title='新建文件夹']")
+            self.driver.execute_script('arguments[0].click()', selector)
+            time.sleep(random.uniform(0.5, 1))
+            # 输入文件夹名称
+            self.driver.find_element_by_class_name('GadHyA').send_keys(dir_name)
+            time.sleep(random.uniform(0.5, 1))
+            selector = self.driver.find_element_by_class_name('gwtz8xMb')
+            self.driver.execute_script('arguments[0].click()', selector)
+            time.sleep(random.uniform(0.5, 1))
+
+    def dir_exist(self, dir_name):
+        selector = None
+        try:
+            selector = self.driver.find_element_by_xpath(
+                f"//div[@class='vdAfKMb']/dd/div[@class='file-name']//div[@class='text']//*[text()='{dir_name}']"
+            )
+        except NoSuchElementException:
+            pass
+        return selector
+
+    def dir_list(self):
+        dir_names = None
+        try:
+            dir_names = [
+                element.text for element in self.driver.find_elements_by_xpath(
+                    "//div[@class='vdAfKMb']/dd/div[@class='file-name']"
+                )]
+        except NoSuchElementException:
+            pass
+        if dir_names:
+            print('全部文件 -->')
+            for dir_name in dir_names:
+                print(f'\t{dir_name}')
+
+    def locate_dir(self, dir_name):
+        selector = self.dir_exist(dir_name)
+        if selector:
+            self.driver.execute_script('arguments[0].click()', selector)
+            time.sleep(random.uniform(0.5, 1))
+    
+    def make_path(self, path):
+        dir_names = path.split('/')
+        for step in range(len(dir_names)):
+            self.make_dir(dir_names[step])
+            if step < len(dir_names):
+                self.locate_dir(dir_names[step])
+
+    def known(self):
+        try:
+            selector = self.driver.find_element_by_class_name('know-button')
+            self.driver.execute_script('arguments[0].click()', selector)
+        except NoSuchElementException:
+            pass
+
 
 if __name__ == '__main__':
 
@@ -170,6 +227,17 @@ if __name__ == '__main__':
     cd.manual_login()
     # login manually and save
     cd.save_cookie(cookie_path='cookie/drive_cookie.txt')
+    """
+
+    """
+    # 操作文件夹
+    cd = CloudDisk(headless=False, limit=False, maximize=False, delete_cookies=False)
+    cd.login_with_cookie(cookie_path='cookie/drive_cookie.txt')
+    cd.known()
+    cd.dir_list()
+    cd.make_dir('test')
+    cd.dir_exist('test')
+    cd.make_path('test/test1/test2/test3')
     """
 
     cd = CloudDisk()
