@@ -3,7 +3,7 @@ import requests
 import re
 import os
 from tortoises.agent import get_headers
-from tortoises.thread import ProcessWrapper
+from tortoises.mul_thread import ProcessWrapper
 import wget
 import time
 from urllib.error import HTTPError

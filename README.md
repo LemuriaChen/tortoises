@@ -71,15 +71,32 @@ chromedriver --version
 * step 2
 
 ```python
-from tortoises.scholar import AppWebKnowledge
+from tortoises.scholar import AppWebKnowledge, AppWebKnowledgeParser
 
-title = 'The ERA-Interim reanalysis: configuration and performance of the data assimilation system'
-apk = AppWebKnowledge(headless=True)
-apk.fetch_homepage(argument=title, mode='title')
-apk.parse_article()
+apk = AppWebKnowledge(headless=True, verbose=True)
 
-print(apk.parsed_info)
+# title = 'The ERA-Interim reanalysis: configuration and performance of the data assimilation system'
+title = 'mechanisms of abrupt climate change of  the last glacial period'
+apk.fetch_article(argument=title, mode='title')
+apk.expand_all_fields()
+parser = AppWebKnowledgeParser(verbose=False).parse_article(apk.driver)
+print(f"article info:\n\ttitle: {title}\n\tdoi: {parser.parsed_info.get('doi')}")
+
+apk.fetch_citation(_type='citing')
+
+while True:
+    for idx in range(apk.num_items_current_page):
+        apk.fetch_current_page(index=idx)
+        apk.expand_all_fields()
+        parser = AppWebKnowledgeParser(verbose=False).parse_article(apk.driver)
+        print(f"article info:\n"
+              f"\ttitle: {apk.driver.find_element_by_class_name('title').text}\n"
+              f"\tdoi: {parser.parsed_info.get('doi')}")
+        apk.switch_handle()
+    apk.next_page()
 ```
+
+![avatar](image/apk.png)
 
 ### pdf bulk downloader
 

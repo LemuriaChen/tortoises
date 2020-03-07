@@ -2,6 +2,7 @@ README.md
 setup.py
 tortoises/__init__.py
 tortoises/agent.py
+tortoises/cloud.py
 tortoises/driver.py
 tortoises/parser.py
 tortoises/scholar.py
