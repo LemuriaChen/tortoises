@@ -5,6 +5,7 @@ tortoises/agent.py
 tortoises/driver.py
 tortoises/parser.py
 tortoises/scholar.py
+tortoises/thread.py
 tortoises/util.py
 tortoises.egg-info/PKG-INFO
 tortoises.egg-info/SOURCES.txt
