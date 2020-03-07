@@ -460,6 +460,16 @@ class AppWebKnowledge(object):
             print(f'[{time()}]:\033[1;31m fail\033[0m to fetch page '
                   f'<\033[1;36m 1\033[0m / \033[1;36m{ self.num_pages }\033[0m > .\n{e}')
 
+    def get_doi(self):
+        doi = ''
+        try:
+            doi = self.driver.find_element_by_xpath(
+                "//div[@class='block-record-info block-record-info-source']"
+                "//span[contains(text(), 'DOI')]/parent::*[1]").text.replace('DOI:', '').strip()
+        except Exception as e:
+            print(e)
+        return doi
+
     def close(self):
         try:
             self.driver.quit()
@@ -566,7 +576,27 @@ class AppWebKnowledge(object):
 
 
 class AppWebKnowledgeParser(object):
+    """
+        模拟点击和解析都没问题了，现在最关键的问题是如何构建作者系统，这里是最难的地方，因为作者的姓名完全可以相同
+        但是文章中包含了 ORC-ID 的比例并不高，具有地址的倒有不少
 
+        方案一：
+            作者名字 -> doi
+        方案二：
+            作者名字 + 地址 -> doi
+        方案三：
+            orc-id -> doi （本身这种方式是最好的，可以达到 多对多，而且不会混淆）
+
+        需要存储的东西
+            作者名称列表（简称、全称）
+            作者地址（通讯作者地址 加上 其他作者地址）
+            作者 orc-id / researcher_id
+            作者邮箱
+
+        这里的模型可能需要更新，之后不再使用 django 自带的 一对多 和 多对多，应该如果这么做，会把自己给限制死
+        之后的数据可能需要进行迁移，可能会造成不变，可能需要考虑一下，抓数据是否使用 django
+        网站搭建可以考虑迁移到 Go 或者 Ruby
+    """
     def __init__(self, verbose=True):
 
         self.verbose = verbose
@@ -681,6 +711,10 @@ class AppWebKnowledgeParser(object):
             ).text.replace('By:', '').replace('...Less', '')
             abbr_author_names = [author.strip() for author in self.ABBR_NAME_EXTRACT_PATTERN.sub('', authors).split(';')]
             full_author_names = [author.strip() for author in self.FULL_NAME_EXTRACT_PATTERN.findall(authors)]
+            # 这里给出留下地址的作者姓名全称（给出一个表，就是 name -> id）
+            # print(re.findall(r'\((.*?)\)\[(.*?)\]', authors))
+            # 还有之后的 address 那里可以给出一个表，就是 id -> address
+            # 这样就能给出所有的 name -> address 的对应，每个地址存在多少人
             self.parsed_info.update({'abbr_names': abbr_author_names, 'full_names': full_author_names})
             if self.verbose:
                 print(f'[{time()}]:\033[1;36m success\033[0m to parse '
@@ -694,8 +728,8 @@ class AppWebKnowledgeParser(object):
 
         # parse < reprint authors> field
         try:
-            self.parsed_info['reprint_authors'] = list(set([_.strip() for _ in self.REPRINT_AUTHOR_EXTRACT_PATTERN.findall(
-                driver.find_element_by_xpath(
+            self.parsed_info['reprint_authors'] = list(
+                set([_.strip() for _ in self.REPRINT_AUTHOR_EXTRACT_PATTERN.findall(driver.find_element_by_xpath(
                     "//div[@class='title3' and contains(text(), 'Author Information')]/parent::*[1]").text)]))
             if self.verbose:
                 print(f"[{time()}]:\033[1;36m success\033[0m to parse <\033[1;36m "
@@ -828,6 +862,7 @@ if __name__ == '__main__':
     # title = 'The ERA-Interim reanalysis: configuration and performance of the data assimilation system'
     title = 'mechanisms of abrupt climate change of  the last glacial period'
     apk.fetch_article(argument=title, mode='title')
+
     apk.expand_all_fields()
     parser = AppWebKnowledgeParser(verbose=False).parse_article(apk.driver)
     print(f"article info:\n\ttitle: {title}\n\tdoi: {parser.parsed_info.get('doi')}")
