@@ -1,6 +1,6 @@
 
 from multiprocessing import Process, Queue
-# import os
+import os
 import time
 import random
 
@@ -45,7 +45,7 @@ class ProcessWrapper(object):
 if __name__ == '__main__':
 
     def print_and_sleep(t):
-        # print(f'get {t} from queue, process ID < {os.getpid()} >')
+        print(f'get {t} from queue, process ID < {os.getpid()} >')
         time.sleep(t / 10)
 
     x = [random.randint(1, 4) for _ in range(100)]

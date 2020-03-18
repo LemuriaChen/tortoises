@@ -3,7 +3,7 @@
 
 # 这里写了一些从复旦大学忘道溯源文献搜索系统进行文献检索和下载的基本逻辑。
 
-from tortoises.driver import start_chrome
+from tortoises.web.driver import start_chrome
 
 driver = start_chrome(headless=False, limit=False)
 

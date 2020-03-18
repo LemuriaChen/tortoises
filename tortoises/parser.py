@@ -2,8 +2,8 @@
 import requests
 import re
 import os
-from tortoises.agent import get_headers
-from tortoises.mul_thread import ProcessWrapper
+from tortoises.web.agent import get_headers
+from tortoises.util.mul_thread import ProcessWrapper
 import wget
 import time
 from urllib.error import HTTPError

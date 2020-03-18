@@ -13,25 +13,26 @@ from selenium.common.exceptions import TimeoutException
 from selenium.common.exceptions import ElementClickInterceptedException
 from selenium.common.exceptions import ElementNotInteractableException
 
-from tortoises.driver import start_chrome
-from tortoises.util import time
+from tortoises.web.driver import start_chrome
+from tortoises.util.help import time
 
 
 class AppWebKnowledge(object):
 
-    def __init__(self, headless=True, verbose=True, mode=None, *args):
+    def __init__(self, mode='slow', verbose=True, *args, **kwargs):
 
         self.base_url = 'http://apps.webofknowledge.com'
-        self.driver = start_chrome(headless, *args)
-        self.base_handle = self.driver.current_window_handle
         self.mode = mode
         self.verbose = verbose
-        self.num_items_per_cited_page = 30
 
-        self.search_status = None                       # 搜索结果状态
-        self.unique_matched = None                      # 搜索结果
-        self.homepage_status = None                     # 文章主页获取状态（如果搜索结果唯一的话）
-        self.searched_title = None                      # 搜索的第一条结果（如果搜索结果唯一的话）
+        self.driver = start_chrome(*args, **kwargs)
+        self.base_handle = self.driver.current_window_handle
+
+        self.num_items_per_cited_page = 30
+        self.search_status = None
+        self.unique_matched = None
+        self.homepage_status = None
+        self.searched_title = None
 
         self.num_pages = None
         self.num_items = None
@@ -39,6 +40,37 @@ class AppWebKnowledge(object):
         self.num_items_current_page = None
         self.current_page = None
         self.num_citing_crawled = None
+
+        self.AUTHOR_WITH_ADDRESS_PATTERN = re.compile(r'(.*)\((.*)?\)\[(.*)\]')
+        self.AUTHOR_WITHOUT_ADDRESS_PATTERN = re.compile(r'(.*)\((.*)?\)')
+        self.ADDRESS_PATTERN = re.compile(r'\[(.*?)\](.*)')
+        self.YEAR_PATTERN = re.compile(r'\d{4}?')
+
+        self.CORE_FIELDS = {
+            'Volume': 'vol',
+            'Issue': 'issue',
+            'Pages': 'page',
+            'DOI': 'doi',
+            'Published': 'date',
+            'Document Type': 'doc_type',
+            'Publisher': 'pub_date',
+            'Author Keywords': 'keyword',
+            'KeyWords Plus': 'keyword_plus',
+            'E-mail Addresses': 'email',
+            'Research Areas': 'ra',
+            'Web of Science Categories': 'category',
+            'Language': 'language',
+            'ISSN': 'sn',
+            'eISSN': 'ei',
+            'Accession Number': 'ut',
+            'IDS Number': 'ga',
+        }
+        self.OTHER_CORE_FIELDS = {
+            'journal': 'sourceTitle',
+            'citing': 'snowplow-citation-network-times-cited-count-link',
+            'citing_all': 'snowplow-citation-network-all-times-cited',
+            'cited': 'snowplow-citation-network-cited-reference-count-link',
+        }
 
     def init(self):
 
@@ -72,7 +104,7 @@ class AppWebKnowledge(object):
             return
 
         print(f'[{time()}]:\033[1;36m success\033[0m to login < http://apps.webofknowledge.com > .')
-        if not self.mode:
+        if self.mode == 'slow':
             sleep(random.uniform(1, 3))
 
         # step 2. switch web language to english if not
@@ -88,12 +120,11 @@ class AppWebKnowledge(object):
                         expected_conditions.presence_of_element_located((By.CLASS_NAME, "search-criteria-input-wr")))
                     if self.verbose:
                         print(f'[{time()}]:\033[1;36m success\033[0m to switch web language from {language} to English.')
-                    if not self.mode:
+                    if self.mode == 'slow':
                         sleep(random.uniform(2, 4))
                     break
                 except (NoSuchElementException, TimeoutException, ):
                     pass
-        return self
 
     def search(self, argument, mode='title'):
 
@@ -118,14 +149,14 @@ class AppWebKnowledge(object):
                 "//div[@class='search-criteria-input-wr']/input"
             )
             selector.clear()
-            if not self.mode:
+            if self.mode == 'slow':
                 sleep(random.uniform(1, 2))
             selector.send_keys(argument)
-            if not self.mode:
+            if self.mode == 'slow':
                 sleep(random.uniform(1, 2))
             if self.verbose:
                 print(f'[{time()}]:\033[1;36m success\033[0m to enter article title .')
-            if not self.mode:
+            if self.mode == 'slow':
                 sleep(random.uniform(1, 3))
         except NoSuchElementException:
             print(f'[{time()}]:\033[1;31m fail\033[0m to enter article title .')
@@ -135,7 +166,7 @@ class AppWebKnowledge(object):
         try:
             self.switch_search_mode(mode)
         except (NoSuchElementException, TimeoutException, ElementClickInterceptedException, ):
-            if not self.mode:
+            if self.mode == 'slow':
                 sleep(random.uniform(1, 2))
             # minimize questionnaire column if exits
             self.hide_advertise_widget()
@@ -145,14 +176,14 @@ class AppWebKnowledge(object):
                 print(f'[{time()}]:\033[1;31m fail\033[0m to switch search mode, may have triggered exceptions .')
                 return
 
-        if not self.mode:
+        if self.mode == 'slow':
             sleep(random.uniform(1, 3))
 
         # step 3. click search button
         try:
             self.click_search_button()
         except (NoSuchElementException, TimeoutException, ElementClickInterceptedException):
-            if not self.mode:
+            if self.mode == 'slow':
                 sleep(random.uniform(1, 2))
             # minimize questionnaire column if exits
             self.hide_advertise_widget()
@@ -164,7 +195,7 @@ class AppWebKnowledge(object):
 
         if self.verbose:
             print(f'[{time()}]:\033[1;37m searched ...\033[0m')
-        if not self.mode:
+        if self.mode == 'slow':
             sleep(random.uniform(1, 3))
 
         # step 4. parse search results
@@ -191,7 +222,7 @@ class AppWebKnowledge(object):
             if self.verbose:
                 print(f'[{time()}]:\033[1;36m success\033[0m to parse the searched page .')
                 print(f'[{time()}]:\033[1;33m multiple\033[0m matched results found .')
-        if not self.mode:
+        if self.mode == 'slow':
             sleep(random.uniform(2, 3))
 
     def search_init(self):
@@ -204,11 +235,14 @@ class AppWebKnowledge(object):
         self.current_page = 1
         self.num_citing_crawled = 0
 
-        print(f'[{time()}: < \033[1;34m{ apk.num_items }\033[0m > searched articles with < \033[1;34m{ apk.num_pages }'
-              f'\033[0m > pages and < \033[1;34m{ apk.num_items_per_page }\033[0m > terms per page .')
-
+        print(f'[{time()}: < \033[1;34m{ self.num_items }\033[0m > searched articles with '
+              f'< \033[1;34m{ self.num_pages }\033[0m > pages and < \033[1;34m{ self.num_items_per_page }\033[0m > '
+              f'terms per page .')
         if self.num_pages * self.num_items_per_page < self.num_items:
-            print(f'[{time()}: <\033[1;36m pages \033[0m> may\033[1;32m be truncated\033[0m .')
+            print(f'[{time()}: too many <\033[1;36m pages \033[0m> and the response\033[1;32m is truncated\033[0m '
+                  f'with a limit <\033[1;34m 10000 \033[0m>.')
+        print(f'[{time()}]:\033[1;36m success\033[0m to fetch page '
+              f'<\033[1;34m 1\033[0m / \033[1;34m{self.num_pages}\033[0m > .')
 
     def switch_search_mode(self, mode):
         """
@@ -219,7 +253,7 @@ class AppWebKnowledge(object):
 
         if current_mode != mode:
             selector.click()
-            if not self.mode:
+            if self.mode == 'slow':
                 sleep(random.uniform(2, 4))
             selectors = self.driver.find_elements_by_class_name('select2-results__option')
             for selector in selectors:
@@ -228,7 +262,7 @@ class AppWebKnowledge(object):
                     if self.verbose:
                         print(f'[{time()}]:\033[1;36m success\033[0m to change search mode '
                               f'from < by {current_mode} > to < by {mode} > .')
-                    if not self.mode:
+                    if self.mode == 'slow':
                         sleep(random.uniform(2, 4))
                     break
 
@@ -239,7 +273,7 @@ class AppWebKnowledge(object):
             ).click()
             if self.verbose:
                 print(f'[{time()}]:\033[1;36m success\033[0m to minimize advertising widget .')
-            if not self.mode:
+            if self.mode == 'slow':
                 sleep(random.uniform(2, 4))
         except NoSuchElementException:
             pass
@@ -271,16 +305,16 @@ class AppWebKnowledge(object):
                 self.driver.get(url)
                 WebDriverWait(driver=self.driver, timeout=60, poll_frequency=0.5).until(
                     expected_conditions.presence_of_element_located((By.XPATH, "//div")))
-                if not self.mode:
+                if self.mode == 'slow':
                     sleep(random.uniform(2, 4))
-                # even if there is no error reported here,
-                # it is not necessarily successful to log in to the homepage of the article.
-                # it's need to see if there is a < title > class element.
+                # it is not necessarily successful to log in to the homepage of the article
+                # even if there is no error reported here
+                # therefore it's need to see if there is < title > class element.
                 if self.driver.find_elements_by_class_name('title'):
                     self.homepage_status = True
                     if self.verbose:
                         print(f'[{time()}]:\033[1;36m success\033[0m to login homepage of article .')
-                    if not self.mode:
+                    if self.mode == 'slow':
                         sleep(random.uniform(1, 3))
             except (NoSuchElementException, TimeoutException, ):
                 if self.verbose:
@@ -318,7 +352,7 @@ class AppWebKnowledge(object):
                 ).click()
                 WebDriverWait(driver=self.driver, timeout=60, poll_frequency=0.5).until(
                     expected_conditions.presence_of_element_located((By.CLASS_NAME, "pagingOptions")))
-                if not self.mode:
+                if self.mode == 'slow':
                     sleep(random.uniform(2, 4))
 
         if key == 'cited':
@@ -339,7 +373,7 @@ class AppWebKnowledge(object):
                 ).click()
                 WebDriverWait(driver=self.driver, timeout=60, poll_frequency=0.5).until(
                     expected_conditions.presence_of_element_located((By.CLASS_NAME, "pagingOptions")))
-                if not self.mode:
+                if self.mode == 'slow':
                     sleep(random.uniform(2, 4))
 
     def _pages_count(self):
@@ -376,16 +410,16 @@ class AppWebKnowledge(object):
             selector = self.driver.find_element_by_class_name('goToPageNumber-input')
             # clear input
             selector.clear()
-            if not self.mode:
+            if self.mode == 'slow':
                 sleep(random.uniform(1, 2))
             selector.send_keys(self.current_page + add)
-            if not self.mode:
+            if self.mode == 'slow':
                 sleep(random.uniform(1, 2))
             # submit page number
             selector.submit()
             WebDriverWait(driver=self.driver, timeout=60, poll_frequency=0.5).until(
                 expected_conditions.presence_of_element_located((By.CLASS_NAME, "goToPageNumber-input")))
-            if not self.mode:
+            if self.mode == 'slow':
                 sleep(random.uniform(4, 6))
             print(f'[{time()}]:\033[1;36m success\033[0m to fetch page '
                   f'<\033[1;34m {self.current_page + add}\033[0m / \033[1;34m{ self.num_pages }\033[0m > .')
@@ -412,7 +446,7 @@ class AppWebKnowledge(object):
             # wait new window
             WebDriverWait(self.driver, 60, 0.5).until(
                 expected_conditions.presence_of_element_located((By.CLASS_NAME, 'title')))
-            if not self.mode:
+            if self.mode == 'slow':
                 sleep(random.uniform(1, 2))
 
             if self.verbose:
@@ -431,10 +465,10 @@ class AppWebKnowledge(object):
         if self.driver.current_window_handle != self.base_handle:
             try:
                 self.driver.close()
-                if not self.mode:
+                if self.mode == 'slow':
                     sleep(random.uniform(0.5, 1))
                 self.driver.switch_to.window(self.base_handle)
-                if not self.mode:
+                if self.mode == 'slow':
                     sleep(random.uniform(0.5, 1))
             except Exception as e:
                 print(e)
@@ -450,7 +484,7 @@ class AppWebKnowledge(object):
                 self.driver.find_element_by_class_name('snowplow-citation-network-cited-reference-count-link').click()
             WebDriverWait(self.driver, 60, 0.5).until(
                 expected_conditions.presence_of_element_located((By.CLASS_NAME, "search-results")))
-            if not self.mode:
+            if self.mode == 'slow':
                 sleep(random.uniform(4, 6))
             self.search_init()
 
@@ -459,16 +493,6 @@ class AppWebKnowledge(object):
         except Exception as e:
             print(f'[{time()}]:\033[1;31m fail\033[0m to fetch page '
                   f'<\033[1;36m 1\033[0m / \033[1;36m{ self.num_pages }\033[0m > .\n{e}')
-
-    def get_doi(self):
-        doi = ''
-        try:
-            doi = self.driver.find_element_by_xpath(
-                "//div[@class='block-record-info block-record-info-source']"
-                "//span[contains(text(), 'DOI')]/parent::*[1]").text.replace('DOI:', '').strip()
-        except Exception as e:
-            print(e)
-        return doi
 
     def close(self):
         try:
@@ -484,7 +508,7 @@ class AppWebKnowledge(object):
                 selector.click()
             else:
                 self.driver.execute_script('arguments[0].click()', selector)
-            if not self.mode:
+            if self.mode == 'slow':
                 sleep(random.uniform(1, 2))
             if self.verbose:
                 print(f'[{time()}]:\033[1;36m success\033[0m to {annotation} .')
@@ -524,14 +548,14 @@ class AppWebKnowledge(object):
             if _type == 'show':
                 if re.findall(r'see more', selector.text.lower()):
                     self.driver.execute_script("arguments[0].click();", selector)
-                    if not self.mode:
+                    if self.mode == 'slow':
                         sleep(random.uniform(1, 2))
                     if self.verbose:
                         print(f'[{time()}]:\033[1;36m success\033[0m to show more data fields .')
             else:
                 if re.findall(r'see fewer', selector.text.lower()):
                     self.driver.execute_script("arguments[0].click();", selector)
-                    if not self.mode:
+                    if self.mode == 'slow':
                         sleep(random.uniform(1, 2))
                     if self.verbose:
                         print(f'[{time()}]:\033[1;36m success\033[0m to hide more data fields .')
@@ -543,7 +567,7 @@ class AppWebKnowledge(object):
         try:
             selector = self.driver.find_element_by_class_name('snowplow-JCRoverlay')
             selector.click()
-            if not self.mode:
+            if self.mode == 'slow':
                 sleep(random.uniform(1, 2))
             if self.verbose:
                 print(f'[{time()}]:\033[1;36m success\033[0m to show journal impact.')
@@ -555,17 +579,18 @@ class AppWebKnowledge(object):
         try:
             selector = self.driver.find_element_by_class_name('button4')
             self.driver.execute_script('arguments[0].click()', selector)
-            if not self.mode:
+            if self.mode == 'slow':
                 sleep(random.uniform(1, 2))
             if self.verbose:
                 print(f'[{time()}]:\033[1;36m success\033[0m to hide journal impact.')
         except (NoSuchElementException, ElementClickInterceptedException, ElementNotInteractableException, ):
             return
 
-    def expand_all_fields(self):
+    def expand_all_fields(self, funding_text=True):
         self._show_more_authors()
         self._show_research_id()
-        self._show_funding_text()
+        if funding_text:
+            self._show_funding_text()
         self._show_more_fields(_type='show')
 
     def fold_all_fields(self):
@@ -574,61 +599,48 @@ class AppWebKnowledge(object):
         self._hide_funding_text()
         self._show_more_fields(_type='hide')
 
-
-class AppWebKnowledgeParser(object):
-    """
-        模拟点击和解析都没问题了，现在最关键的问题是如何构建作者系统，这里是最难的地方，因为作者的姓名完全可以相同
-        但是文章中包含了 ORC-ID 的比例并不高，具有地址的倒有不少
-
-        方案一：
-            作者名字 -> doi
-        方案二：
-            作者名字 + 地址 -> doi
-        方案三：
-            orc-id -> doi （本身这种方式是最好的，可以达到 多对多，而且不会混淆）
-
-        需要存储的东西
-            作者名称列表（简称、全称）
-            作者地址（通讯作者地址 加上 其他作者地址）
-            作者 orc-id / researcher_id
-            作者邮箱
-
-        这里的模型可能需要更新，之后不再使用 django 自带的 一对多 和 多对多，应该如果这么做，会把自己给限制死
-        之后的数据可能需要进行迁移，可能会造成不变，可能需要考虑一下，抓数据是否使用 django
-        网站搭建可以考虑迁移到 Go 或者 Ruby
-    """
-    def __init__(self, verbose=True):
-
-        self.verbose = verbose
-        self.ABBR_NAME_EXTRACT_PATTERN = re.compile(r'\(.*?\)|\[.*?\]')
-        self.FULL_NAME_EXTRACT_PATTERN = re.compile(r'\((.*?)\)')
-        self.ORC_ID_EXTRACT_PATTERN = re.compile(r'\d+-\d+-\d+-\d+')
-        self.REPRINT_AUTHOR_EXTRACT_PATTERN = re.compile(r'Reprint Address:(.*?)\(reprint author\)')
-        self.SINGLE_QUOTES_EXTRACT_PATTERN = re.compile(r'\'(.*)\'')
-        self.ADDRESS_PATTERN = re.compile(r'\[.*?\]')
-        self.NUM_PATTERN = re.compile(r'\d')
-        self.YEAR_PATTERN = re.compile(r'\d{4}?')
-
-        self.CORE_FIELDS = {
-            'Volume': 'vol', 'Issue': 'issue', 'Pages': 'pages', 'Part': 'part', 'Article Number': 'art_num',
-            'DOI': 'doi', 'Published': 'date', 'Document Type': 'doc_type', 'Publisher': 'publisher',
-            'Author Keywords': 'keywords', 'KeyWords Plus': 'keywords_plus', 'E-mail Addresses': 'email',
-            'Research Areas': 'sc', 'Web of Science Categories': 'category', 'Language': 'language',
-            'ISSN': 'sn', 'eISSN': 'ei', 'Accession Number': 'ut', 'IDS Number': 'ga', 'PubMed ID': 'pm',
-        }
-        self.OTHER_CORE_FIELDS = {
-            'journal': 'sourceTitle',
-            'citing': 'snowplow-citation-network-times-cited-count-link',
-            'citing_all': 'snowplow-citation-network-all-times-cited',
-            'cited': 'snowplow-citation-network-cited-reference-count-link',
-        }
-        self.parsed_info = {}
-
-    def parse_article(self, driver, **kwargs):
-
-        # parse core fields
+    def parse_doi(self, verbose=True):
+        # parse < doi > field
+        doi = ''
         try:
-            for element in driver.find_elements_by_class_name('FR_field'):
+            doi = self.driver.find_element_by_xpath(
+                "//div[@class='block-record-info block-record-info-source']"
+                "//span[contains(text(), 'DOI')]/parent::*[1]").text.replace('DOI:', '').strip()
+        except NoSuchElementException:
+            pass
+        if doi and self.verbose and verbose:
+            print(f'[{time()}]:\033[1;36m success\033[0m to parse < doi > field .')
+        return doi
+
+    def parse_title(self, verbose=True):
+        # parse < title > field
+        title = ''
+        try:
+            title = self.driver.find_element_by_class_name('title').text.strip()
+        except NoSuchElementException:
+            pass
+        if title and self.verbose and verbose:
+            print(f'[{time()}]:\033[1;36m success\033[0m to parse < title > field .')
+        return title
+
+    def parse_abstract(self, verbose=True):
+        # parse < abstract > field
+        abstract_field = {}
+        try:
+            abstract = self.driver.find_element_by_xpath(
+                "//div[text()='Abstract' and @class='title3']/../p").text
+            abstract_field.update({'abstract': abstract})
+        except NoSuchElementException:
+            pass
+        if abstract_field and self.verbose and verbose:
+            print(f'[{time()}]:\033[1;36m success\033[0m to parse < abstract > field .')
+        return abstract_field
+
+    def parse_core(self, verbose=True):
+        # parse < core > fields
+        core_field = {}
+        try:
+            for element in self.driver.find_elements_by_class_name('FR_field'):
                 value = element.text.strip()
                 for field in self.CORE_FIELDS:
                     if value.startswith(field):
@@ -636,269 +648,227 @@ class AppWebKnowledgeParser(object):
                             value = ''.join(value.replace(field, '').split(':')[1:]).strip()
                         else:
                             value = value.replace(field, '').strip()
-                        self.parsed_info.update({
-                            self.CORE_FIELDS.get(field): value
+                        core_field.update({
+                            self.CORE_FIELDS.get(field): value.replace('WOS', '').strip()
                         })
-                        if self.verbose:
+                        if self.verbose and verbose:
                             print(f'[{time()}]:\033[1;36m success\033[0m to parse < {field.lower()} > field .')
         except NoSuchElementException:
             pass
 
-        # parse other core fields
-        for field in self.OTHER_CORE_FIELDS:
-            try:
-                self.parsed_info.update({
-                    field: driver.find_element_by_class_name(
-                        self.OTHER_CORE_FIELDS.get(field)).text})
-                if self.verbose:
-                    print(f'[{time()}]:\033[1;36m success\033[0m to parse < {field} > field .')
-            except NoSuchElementException:
-                pass
-
-        # parse < abstract > field
-        try:
-            self.parsed_info.update({
-                'abstract': driver.find_element_by_xpath(
-                    "//div[text()='Abstract' and @class='title3']/.."
-                ).find_element_by_tag_name('p').text.strip(),
-            })
-            if self.verbose:
-                print(f'[{time()}]:\033[1;36m success\033[0m to parse < abstract > field .')
-        except NoSuchElementException:
-            pass
-
-        # parse < publisher > field
-        try:
-            self.parsed_info.update({
-                'publisher': driver.find_element_by_xpath(
-                    "//div[text()='Publisher' and @class='title3']/.."
-                ).find_element_by_tag_name('p').text.strip(),
-            })
-            if self.verbose:
-                print(f'[{time()}]:\033[1;36m success\033[0m to parse < abstract > field .')
-        except NoSuchElementException:
-            pass
-
-        # parse < funding text > field
-        try:
-            self.parsed_info.update({
-                'funding_text': driver.find_element_by_id('show_fund_blurb').text,
-            })
-            if self.verbose:
-                print(f'[{time()}]:\033[1;36m success\033[0m to parse < funding text > field .')
-        except NoSuchElementException:
-            pass
-
-        # parse < funding > field
-        agency, grant_number = [], []
-        try:
-            for tb_row in driver.find_element_by_xpath(
-                "//div[text()='Funding' and @class='title3']/.."
-            ).find_element_by_tag_name('table').find_elements_by_tag_name('tr')[1:]:
-                agency.append(tb_row.find_elements_by_tag_name('td')[0].text.strip())
-                grant_number.append(tb_row.find_elements_by_tag_name('td')[1].text.strip())
-            if agency or grant_number:
-                self.parsed_info.update({'funding': {'agency': agency, 'grant_number': grant_number}})
-                if self.verbose:
-                    print(f'[{time()}]:\033[1;36m success\033[0m to parse < funding > field .')
-        except NoSuchElementException:
-            pass
-
-        # parse < authors > field
-        try:
-            authors = driver.find_element_by_xpath(
-                "//span[contains(text(), 'By') and @class='FR_label']/.."
-            ).text.replace('By:', '').replace('...Less', '')
-            abbr_author_names = [author.strip() for author in self.ABBR_NAME_EXTRACT_PATTERN.sub('', authors).split(';')]
-            full_author_names = [author.strip() for author in self.FULL_NAME_EXTRACT_PATTERN.findall(authors)]
-            # 这里给出留下地址的作者姓名全称（给出一个表，就是 name -> id）
-            # print(re.findall(r'\((.*?)\)\[(.*?)\]', authors))
-            # 还有之后的 address 那里可以给出一个表，就是 id -> address
-            # 这样就能给出所有的 name -> address 的对应，每个地址存在多少人
-            self.parsed_info.update({'abbr_names': abbr_author_names, 'full_names': full_author_names})
-            if self.verbose:
-                print(f'[{time()}]:\033[1;36m success\033[0m to parse '
-                      f'<\033[1;36m {len(abbr_author_names)}\033[0m > abbreviated author names and '
-                      f'<\033[1;36m {len(full_author_names)}\033[0m > full author names .')
-            assert len(abbr_author_names) == len(full_author_names)
-        except NoSuchElementException:
-            pass
-        except AssertionError:
-            print(f'[{time()}]:\033[1;31m inconsistent\033[0m number of authors .')
-
-        # parse < reprint authors> field
-        try:
-            self.parsed_info['reprint_authors'] = list(
-                set([_.strip() for _ in self.REPRINT_AUTHOR_EXTRACT_PATTERN.findall(driver.find_element_by_xpath(
-                    "//div[@class='title3' and contains(text(), 'Author Information')]/parent::*[1]").text)]))
-            if self.verbose:
-                print(f"[{time()}]:\033[1;36m success\033[0m to parse <\033[1;36m "
-                      f"{len(self.parsed_info['reprint_authors'])}\033[0m > reprint authors .")
-        except NoSuchElementException:
-            pass
-
-        # parse < author addresses > field
-        if self.parsed_info.get('abbr_names') and self.parsed_info.get('full_names'):
-            addresses = {}
-            try:
-                for element in driver.find_elements_by_xpath(
-                        "//table[@class='FR_table_noborders']//td[@class='fr_address_row2']"):
-                    try:
-                        addresses.update({
-                            element.find_element_by_tag_name('a').get_attribute('name').strip():
-                                self.ADDRESS_PATTERN.sub('', element.find_element_by_tag_name('a').text).strip()
-                        })
-                    except (NoSuchElementException, AttributeError, ):
-                        pass
-                if self.verbose:
-                    print(f'[{time()}]:\033[1;36m success\033[0m to parse <\033[1;36m {len(addresses)}\033[0m > addresses .')
-            except NoSuchElementException:
-                pass
-
-            if addresses:
-                author_addresses_list = []
-                reprint_author_addresses = defaultdict(list)
-                try:
-                    for sup in driver.find_element_by_xpath(
-                            "//span[text()='By:' and @class='FR_label']/..").find_elements_by_tag_name('sup'):
-                        abbr_name = sup.find_element_by_xpath('preceding-sibling::*[1]').text.strip()
-                        for a in sup.find_elements_by_tag_name('a'):
-                            address = addresses.get(self.SINGLE_QUOTES_EXTRACT_PATTERN.findall(a.get_attribute('href'))[0])
-                            author_addresses_list.append(
-                                [abbr_name, address]
-                            )
-                            if self.parsed_info.get('reprint_authors') and \
-                                    abbr_name in self.parsed_info.get('reprint_authors'):
-                                reprint_author_addresses[abbr_name].append(address)
-                    author_addresses = defaultdict(list)
-                    for author, address in author_addresses_list:
-                        author_addresses[address].append(author)
-                    self.parsed_info.update({
-                        'author_addresses': author_addresses,
-                        'reprint_author_addresses': reprint_author_addresses
-                    })
-                    if self.verbose:
-                        print(f'[{time()}]:\033[1;36m success\033[0m to parse author addresses and '
-                              f'<\033[1;36m {len(reprint_author_addresses)}\033[0m > reprint authors addresses .')
-                except NoSuchElementException:
-                    pass
-
-        # parse < ORC-ID > field
-        orc_ids = {}
-        try:
-            for tb_row in driver.find_element_by_id(
-                    'show_resc_blurb').find_element_by_tag_name('table').find_elements_by_tag_name('tr')[1:]:
-                td_col = tb_row.find_elements_by_tag_name('td')
-                orc_id = td_col[2].text.strip().replace('http://orcid.org/', '').strip()
-                author = td_col[0].text
-                orc_ids[orc_id] = author
-            if orc_ids:
-                self.parsed_info.update({'orc_ids': orc_ids})
-                if self.verbose:
-                    print(f'[{time()}]:\033[1;36m success\033[0m to parse < orc-id > field .')
-        except NoSuchElementException:
-            pass
-
-        if self.verbose:
-            print(f'[{time()}]:\033[1;32m success\033[0m to parse the whole html DOM tree of the article .')
-
-        # process numerical field
-        for key in ['citing_all', 'citing', 'cited', ]:
-            if key not in self.parsed_info or not self.parsed_info.get(key):
-                self.parsed_info[key] = '0'
-            try:
-                self.parsed_info[key] = eval(''.join(self.NUM_PATTERN.findall(self.parsed_info[key])))
-                if self.verbose:
-                    print(f'[{time()}]:\033[1;36m success\033[0m to numeric < {key} > field .')
-            except (NameError, SyntaxError, ):
-                self.parsed_info[key] = 0
-
-        # process < reprint_author, accession number > field
-        if self.parsed_info.get('reprint_author'):
-            self.parsed_info['reprint_author'] = self.parsed_info['reprint_author'].replace(
-                '(reprint author)', '').strip()
-        if self.parsed_info.get('ut'):
-            self.parsed_info['ut'] = self.parsed_info['ut'].replace('WOS', '').strip()
-
         # infer < year > field
-        if self.parsed_info.get('date'):
+        if core_field.get('date'):
             try:
-                self.parsed_info['year'] = eval(self.YEAR_PATTERN.findall(self.parsed_info.get('date'))[0])
-                if self.verbose:
+                core_field['year'] = eval(self.YEAR_PATTERN.findall(core_field.get('date'))[0])
+                if self.verbose and verbose:
                     print(f'[{time()}]:\033[1;36m success\033[0m to inference < year > field .')
             except (SyntaxError, NameError, IndexError):
                 pass
+        return core_field
 
-        # dumps some fields
-        for field in ['abbr_names', 'full_names', 'reprint_authors', 'author_addresses', 'funding', ]:
-            if field in self.parsed_info:
-                self.parsed_info[field] = json.dumps(self.parsed_info[field])
-                if self.verbose:
-                    print(f'[{time()}]:\033[1;36m success\033[0m to dumps the < {field} > field .')
+    def parse_other_core(self, verbose=True):
+        # parse other core fields
+        other_core_field = {}
+        for field in self.OTHER_CORE_FIELDS:
+            try:
+                other_core_field.update({
+                    field: self.driver.find_element_by_class_name(
+                        self.OTHER_CORE_FIELDS.get(field)).text.strip()})
+                if self.verbose and verbose:
+                    print(f'[{time()}]:\033[1;36m success\033[0m to parse < {field.lower()} > field .')
+            except NoSuchElementException:
+                pass
+        # process numerical field
+        for field in ['citing_all', 'citing', 'cited']:
+            if field not in other_core_field or not other_core_field.get(field):
+                other_core_field[field] = '0'
+            try:
+                other_core_field[field] = eval(other_core_field.get(field).replace(',', ''))
+            except (NameError, SyntaxError):
+                other_core_field[field] = 0
+            if self.verbose and verbose:
+                print(f'[{time()}]:\033[1;36m success\033[0m to numeric < {field} > field .')
+        return other_core_field
 
-        # dumps some fields
-        journal_detail = {}
-        for field in ['vol', 'issue', 'pages', 'part', 'art_num', ]:
-            if field in self.parsed_info:
-                journal_detail[field] = self.parsed_info.get(field)
-                if self.verbose:
-                    print(f'[{time()}]:\033[1;36m success\033[0m to dumps the < {field} > field .')
-        if journal_detail:
-            self.parsed_info['journal_detail'] = json.dumps(journal_detail)
+    def parse_author(self, verbose=True):
+        # parse < authors > field
+        author_field, au, af, addr2af = {}, [], [], defaultdict(list)
+        try:
+            authors = self.driver.find_element_by_xpath(
+                "//p[@class='FR_field']/span[contains(text(), 'By')]/.."
+            ).text.replace('By:', '').replace('...Less', '')
+            for author in authors.split(';'):
+                try:
+                    if '[' in author and ']' in author:
+                        abbreviated_name, full_name, address_idx = self.AUTHOR_WITH_ADDRESS_PATTERN.findall(author)[0]
+                        for addr in address_idx.split(','):
+                            addr2af[addr.strip()].append(full_name.strip())
+                    else:
+                        abbreviated_name, full_name = self.AUTHOR_WITHOUT_ADDRESS_PATTERN.findall(author)[0]
+                except IndexError:
+                    continue
+                au.append(abbreviated_name.strip())
+                af.append(full_name.strip())
+        except NoSuchElementException:
+            pass
+        if au and af:
+            author_field.update({'au': au, 'af': af})
+            if self.verbose and verbose:
+                print(f'[{time()}]:\033[1;36m success\033[0m to parse <\033[1;36m {len(au)}\033[0m > '
+                      f'abbreviated author names and <\033[1;36m {len(af)}\033[0m > full author names with '
+                      f'<\033[1;36m {len(addr2af)}\033[0m > addresses .')
 
-        # add additional fields if exits
-        self.parsed_info.update(kwargs)
+        # parse < author addresses > field
+        idx2addr = {}
+        addresses = self.driver.find_elements_by_xpath(
+            "//p[@class='FR_field']/span[contains(text(), 'Addresses')]/../following-sibling::table[1]"
+            "/tbody/tr/td[@class='fr_address_row2']/a"
+        )
+        if addresses:
+            for address in addresses:
+                try:
+                    idx, addr = self.ADDRESS_PATTERN.findall(address.text)[0]
+                except IndexError:
+                    continue
+                idx2addr[idx.strip()] = addr.strip()
+            if self.verbose and verbose:
+                print(f'[{time()}]:\033[1;36m success\033[0m to parse '
+                      f'<\033[1;36m {len(addresses)} \033[0m> addresses .')
 
-        if self.verbose:
-            print(f'[{time()}]:\033[1;32m success\033[0m to process and clean the article fields .')
+        # merge < addresses > field
+        c1 = {}
+        if idx2addr:
+            for idx in idx2addr:
+                c1[idx2addr.get(idx)] = addr2af.get(idx) if addr2af.get(idx) else []
+            author_field.update({'c1': c1})
+            if self.verbose and verbose:
+                print(f'[{time()}]:\033[1;36m success\033[0m to parse < c1 > field .')
 
-        return self
+        # parse < reprint author> field
+        rp = ''
+        try:
+            rp = self.driver.find_element_by_xpath(
+                "//p[@class='FR_field']/span[contains(text(), 'Reprint Address')]/.."
+            ).text.replace('Reprint Address:', '').replace('(reprint author)', '').strip()
+        except NoSuchElementException:
+            pass
+        if rp:
+            author_field.update({'rp': rp})
+            if self.verbose and verbose:
+                print(f'[{time()}]:\033[1;36m success\033[0m to parse reprint author .')
+
+        return author_field
+
+    def parse_publisher(self, verbose=True):
+        # parse < publisher > field
+        publisher_field = {}
+        try:
+            publisher = self.driver.find_element_by_xpath(
+                "//div[text()='Publisher' and @class='title3']/../p").text.strip()
+            publisher_field.update({'publisher': publisher})
+        except NoSuchElementException:
+            pass
+        if publisher_field:
+            if self.verbose and verbose:
+                print(f'[{time()}]:\033[1;36m success\033[0m to parse < publisher > field .')
+        return publisher_field
+
+    def parse_funding(self, verbose=True):
+        # parse < funding > field
+        funding_field, funding = {}, []
+        try:
+            for tb_row in self.driver.find_element_by_xpath(
+                "//div[text()='Funding' and @class='title3']/.."
+            ).find_element_by_tag_name('table').find_elements_by_tag_name('tr')[1:]:
+                agency, grant_number = tb_row.find_elements_by_tag_name('td')
+                funding.append((agency.text.strip(), grant_number.text.strip()))
+        except NoSuchElementException:
+            pass
+        if funding:
+            funding_field.update({'funding': funding})
+            if self.verbose and verbose:
+                print(f'[{time()}]:\033[1;36m success\033[0m to parse < funding > field .')
+
+        # parse < funding text > field
+        funding_text = ''
+        try:
+            funding_text = self.driver.find_element_by_id('show_fund_blurb').text.strip()
+        except NoSuchElementException:
+            pass
+        if funding_text:
+            funding_field.update({'funding_text': funding_text})
+            if self.verbose and verbose:
+                print(f'[{time()}]:\033[1;36m success\033[0m to parse < funding text > field .')
+
+        return funding_field
+
+    def parse_id(self, verbose=True):
+        # parse < orc-id > and < researcher-id > field
+        id_field, oi, ri = {}, {}, {}
+        try:
+            for tb_row in self.driver.find_elements_by_xpath(
+                    "//div[@class='block-record-info']"
+                    "/span[@id='show_resc_blurb']/table/tbody/tr")[1:]:
+                author, rid, oid = [_.text.strip().replace(
+                    'http://orcid.org/', '').strip() for _ in tb_row.find_elements_by_tag_name('td')]
+                if author and rid:
+                    ri[rid] = author
+                if author and oid:
+                    oi[oid] = author
+        except NoSuchElementException:
+            pass
+
+        if oi:
+            id_field.update({'oi': oi})
+            if self.verbose and verbose:
+                print(f'[{time()}]:\033[1;36m success\033[0m to parse < orc-id > field .')
+        if ri:
+            id_field.update({'ri': ri})
+            if self.verbose and verbose:
+                print(f'[{time()}]:\033[1;36m success\033[0m to parse < researcher-id > field .')
+
+    def parse_article(self, verbose=False, dump=True, **kwargs):
+
+        if not self.parse_title():
+            print(f'[{time()}]:\033[1;36m fail\033[0m to parse the article, '
+                  f'try to check out the <\033[1;33m validity \033[0m> of current url .')
+            return {}
+        else:
+            parsed_info = {}
+            parsed_info.update(self.parse_core(verbose=verbose))
+            parsed_info.update(self.parse_other_core(verbose=verbose))
+            parsed_info.update(self.parse_author(verbose=verbose))
+            parsed_info.update(self.parse_funding(verbose=verbose))
+            parsed_info.update(self.parse_abstract(verbose=verbose))
+            parsed_info.update(self.parse_publisher(verbose=verbose))
+
+            # dumps some fields
+            if dump:
+                for field in parsed_info:
+                    if isinstance(parsed_info.get(field), list) or isinstance(parsed_info.get(field), dict):
+                        parsed_info[field] = json.dumps(parsed_info[field])
+                        if self.verbose and verbose:
+                            print(f'[{time()}]:\033[1;36m success\033[0m to dumps the < {field} > field .')
+
+            # add additional fields if exits
+            parsed_info.update(kwargs)
+
+            if self.verbose and verbose:
+                print(f'[{time()}]:\033[1;34m success\033[0m to parse the whole html DOM tree of the article .')
+        return parsed_info
 
 
 if __name__ == '__main__':
 
-    apk = AppWebKnowledge(headless=True, verbose=True)
-
-    # title = 'The ERA-Interim reanalysis: configuration and performance of the data assimilation system'
-    title = 'mechanisms of abrupt climate change of  the last glacial period'
-    apk.fetch_article(argument=title, mode='title')
-
-    apk.expand_all_fields()
-    parser = AppWebKnowledgeParser(verbose=False).parse_article(apk.driver)
-    print(f"article info:\n\ttitle: {title}\n\tdoi: {parser.parsed_info.get('doi')}")
-
-    apk.fetch_citation(_type='citing')
-
-    while True:
-        for idx in range(apk.num_items_current_page):
-            apk.fetch_current_page(index=idx)
-            apk.expand_all_fields()
-            parser = AppWebKnowledgeParser(verbose=False).parse_article(apk.driver)
-            print(f"article info:\n"
-                  f"\ttitle: {apk.driver.find_element_by_class_name('title').text}\n"
-                  f"\tdoi: {parser.parsed_info.get('doi')}")
-            apk.switch_handle()
-        apk.next_page()
-
-    # apk.fetch_article(argument=title, mode='title')
-    # apk.fetch_article(argument='10.1111/hic3.12497', mode='doi')
-    # apk.fetch_article(argument='Klein, Naomi', mode='author')
+    # apk = AppWebKnowledge(mode='slow', verbose=True, headless=False, limit=False, maximize=False)
     #
-    # apk.fetch_home().search(argument='変なもの', mode='title')
-    # apk.fetch_home().search(argument='10.1111/hic3.12497', mode='doi')
-    # apk.fetch_home().search(argument='Klein, Naomi', mode='author')
+    # argument = 'The ERA-Interim reanalysis: configuration and performance of the data assimilation system'
+    # argument = 'Effects on Carbon Sources and Sinks from Conversion of Over-Mature Forest to ' \
+    #            'Major Secondary Forests and Korean Pine Plantation in Northeast China'
+    # apk.fetch_article(argument=argument, mode='title')
+    # apk.expand_all_fields(funding_text=True)
+    # info = apk.parse_article(verbose=True)
     #
-    # apk.fetch_home().search(argument='climate change', mode='title')
-    # apk.search_init()
-    # print(apk.current_page)
-    # print(apk.num_pages)
-    # print(apk.num_items_per_page)
-    # print(apk.num_items)
-    # print(apk.num_items_current_page)
-    # apk.sort(key='cited', reverse=True)
-    # apk.sort(key='cited', reverse=False)
-    # apk.sort(key='date', reverse=True)
-    # apk.sort(key='date', reverse=False)
-    # apk.next_page()
-    # apk.fetch_current_page(index=1)
-    # apk.switch_handle()
+    # argument = 'climate change'
+    # apk.search(argument=argument, mode='topic')
+    pass
